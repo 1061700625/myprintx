@@ -1,25 +1,28 @@
-# colorprintx 🎨
+# myprintx 🎨
 A lightweight Python library that enhances the built-in `print()` function.
 
 ## Features
-- ✅ Foreground & background color control  
-- ✅ Text styles: **bold**, _italic_, underline  
-- ✅ Compatible with built-in `print` behavior  
-- ✅ Optional global patch (one line activation)
+- ✅ Colorful output — control both foreground & background colors
+- ✅ Text styles — support bold, italic, and underline
+- ✅ Non-intrusive design — 100% compatible with the built-in print()
+- ✅ Global patch — one-line activation for all print() calls
+- ✅ Auto prefix — show date, time, tag, and location info
+- ✅ Built-in log helpers — info(), warn(), error(), debug()
 
 ## Install
 ```bash
 pip install myprint
 ```
+> 🧩 No extra dependencies.
 
 ## Usage
 ```bash
 # 基本用法
-from myprintx import print
-print("普通输出")
-print("成功", fg_color="green", style="bold")
-print("警告", fg_color="yellow", style="underline")
-print("错误", fg_color="white", bg_color="red")
+import myprintx
+myprintx.print("普通输出")
+myprintx.print("成功", fg_color="green", style="bold")
+myprintx.print("警告", fg_color="yellow", style="underline")
+myprintx.print("错误", fg_color="white", bg_color="red")
 
 # 启用彩色全局打印
 import myprintx
@@ -35,6 +38,15 @@ myprintx.patch_prefix(custom_prefix="INFO", show_location=True)
 myprintx.print("启动成功", fg_color="green")
 myprintx.print("任务执行中", fg_color="cyan")
 myprintx.unpatch_prefix()  # 关闭前缀
+
+# 简易快速调用
+import myprintx
+myprintx.patch_prefix(show_location=True)
+myprintx.info("系统初始化完成")
+myprintx.warn("配置文件缺少部分字段")
+myprintx.error("数据库连接失败")
+myprintx.debug("缓存刷新完成")
+myprintx.unpatch_prefix()
 ```
 
 ## Publish

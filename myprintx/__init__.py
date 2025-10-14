@@ -3,7 +3,11 @@ from .core import (
     patch_color,
     unpatch_color,
     patch_prefix,
-    unpatch_prefix
+    unpatch_prefix,
+    info,
+    warn,
+    error,
+    debug,
 )
 
 __all__ = [
@@ -11,7 +15,11 @@ __all__ = [
     "patch_color",
     "unpatch_color",
     "patch_prefix",
-    "unpatch_prefix"
+    "unpatch_prefix",
+    "info",
+    "warn",
+    "error",
+    "debug",
 ]
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"

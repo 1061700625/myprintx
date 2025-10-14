@@ -26,6 +26,8 @@ class TestMyPrintX(unittest.TestCase):
         """返回打印输出（不自动清除 ANSI）"""
         return self.output.getvalue().strip()
 
+    # ---------- 基本功能测试 ----------
+
     def test_basic_print(self):
         """测试基本打印功能"""
         myprintx.print("Hello World")
@@ -39,6 +41,8 @@ class TestMyPrintX(unittest.TestCase):
         out = self.get_output()
         # 验证包含 ANSI 控制码（粗体和绿色）
         self.assertRegex(out, r"\033\[[0-9;]*1;?32")
+
+    # ---------- 前缀功能测试 ----------
 
     def test_patch_prefix_default(self):
         """测试默认前缀（日期+时间）"""
@@ -101,6 +105,62 @@ class TestMyPrintX(unittest.TestCase):
         self.assertIn("DEBUG", out)
         self.assertIn("多彩前缀测试", out)
 
-# python -m unittest discover -s tests -v
+    # ---------- 新增测试：颜色与前缀分离 ----------
+
+    def test_color_does_not_affect_prefix(self):
+        """验证正文颜色不会污染前缀部分"""
+        myprintx.patch_prefix(show_location=True)
+        myprintx.print("系统初始化完成", fg_color="red")
+
+        out = self.get_output()
+
+        # 检查前缀部分颜色（绿色与蓝色）存在
+        self.assertIn("\033[32m", out)
+        self.assertIn("\033[34m", out)
+        # 正文部分应为红色
+        self.assertIn("\033[31m", out)
+        # 确认前缀颜色没有被红色覆盖（红色出现在后面）
+        prefix_index = out.find("\033[32m")
+        red_index = out.find("\033[31m")
+        self.assertGreater(red_index, prefix_index, "红色应在前缀之后出现")
+
+    # ---------- 快捷日志函数 ----------
+
+    def test_info_output(self):
+        """测试 info() 输出为青色"""
+        myprintx.patch_prefix(show_location=True)
+        myprintx.info("系统启动")
+        out = self.get_output()
+        self.assertIn("[INFO]", out)
+        self.assertIn("\033[36m", out)
+
+    def test_warn_output(self):
+        """测试 warn() 输出为黄色加粗"""
+        myprintx.patch_prefix()
+        myprintx.warn("网络异常")
+        out = self.get_output()
+        self.assertIn("[WARN]", out)
+        self.assertRegex(out, r"\033\[[0-9;]*33")  # 黄色 (允许带样式)
+        self.assertRegex(out, r"\033\[[0-9;]*1")   # 加粗
+
+    def test_error_output(self):
+        """测试 error() 输出为红色加粗"""
+        myprintx.patch_prefix()
+        myprintx.error("数据库连接失败")
+        out = self.get_output()
+        self.assertIn("[ERROR]", out)
+        self.assertRegex(out, r"\033\[[0-9;]*31")  # 红色 (允许带样式)
+        self.assertRegex(out, r"\033\[[0-9;]*1")   # 加粗
+
+    def test_debug_output(self):
+        """测试 debug() 输出为白色"""
+        myprintx.patch_prefix()
+        myprintx.debug("缓存刷新完成")
+        out = self.get_output()
+        self.assertIn("[DEBUG]", out)
+        self.assertIn("\033[37", out)  # 白色
+
+
+# 运行所有测试
 if __name__ == "__main__":
     unittest.main(verbosity=2)

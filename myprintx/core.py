@@ -77,13 +77,18 @@ def print(
         prefix_text = " ".join(parts)
 
     # 手动 prefix 参数优先
-    if prefix:
-        prefix_text = str(prefix)
+    if prefix: prefix_text = str(prefix)
+    # 分离前缀和正文的颜色区域
     if prefix_text:
-        text = f"[{prefix_text}] {text}"
-    # ---------------------------------
+        # 保持前缀原有颜色（由 patch_prefix 内部定义）
+        text = f"[{prefix_text}] {prefix_code}{text}{suffix_code}"
+    else:
+        # 没有前缀时，正常加色
+        text = f"{prefix_code}{text}{suffix_code}"
 
-    output = f"{prefix_code}{text}{suffix_code}"
+    output = text
+
+
 
     if hasattr(builtins, "__orig_print__"):
         builtins.__orig_print__(output, sep=sep, end=end, file=file or sys.stdout, flush=flush)
@@ -135,4 +140,39 @@ def unpatch_prefix():
     """
     if hasattr(builtins, "__print_prefix__"):
         del builtins.__print_prefix__
-# ---------------------------------------------
+     
+
+def _with_temp_color(func):
+    """装饰器：在调用前启用 patch_color()，调用后恢复"""
+    def wrapper(*args, **kwargs):
+        # 保存当前 print
+        orig_print = builtins.print
+        try:
+            # 临时启用彩色打印
+            patch_color()
+            return func(*args, **kwargs)
+        finally:
+            # 恢复原始 print
+            unpatch_color()
+            builtins.print = orig_print
+    return wrapper
+
+@_with_temp_color
+def info(*args, **kwargs):
+    """信息输出（蓝色）"""
+    print("[INFO]", *args, fg_color="cyan", **kwargs)
+
+@_with_temp_color
+def warn(*args, **kwargs):
+    """警告输出（黄色加粗）"""
+    print("[WARN]", *args, fg_color="yellow", style="bold", **kwargs)
+
+@_with_temp_color
+def error(*args, **kwargs):
+    """错误输出（红色加粗）"""
+    print("[ERROR]", *args, fg_color="red", style="bold", **kwargs)
+
+@_with_temp_color
+def debug(*args, **kwargs):
+    """调试输出（青色）"""
+    print("[DEBUG]", *args, fg_color="white", **kwargs)
