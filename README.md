@@ -14,12 +14,27 @@ pip install myprint
 
 ## Usage
 ```bash
->>> import myprintx
->>> myprintx.print("a", fg_color="green")   # ✅ 正常（未打补丁）
->>> myprintx.auto_patch_color()
->>> print("b", fg_color="red")              # ✅ 正常（已打补丁）
->>> myprintx.unpatch()
->>> print("c")                              # ✅ 恢复为普通print
+# 基本用法
+from myprintx import print
+print("普通输出")
+print("成功", fg_color="green", style="bold")
+print("警告", fg_color="yellow", style="underline")
+print("错误", fg_color="white", bg_color="red")
+
+# 启用彩色全局打印
+import myprintx
+myprintx.patch_color()
+print("绿色输出", fg_color="green", style="bold")
+print("错误输出", fg_color="white", bg_color="red")
+myprintx.unpatch_color()  # 恢复原始 print()
+
+# 启用前缀打印
+import myprintx
+## 启用：日期、时间、自定义标签、位置信息
+myprintx.patch_prefix(custom_prefix="INFO", show_location=True)
+myprintx.print("启动成功", fg_color="green")
+myprintx.print("任务执行中", fg_color="cyan")
+myprintx.unpatch_prefix()  # 关闭前缀
 ```
 
 ## Publish
