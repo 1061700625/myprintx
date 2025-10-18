@@ -1,6 +1,8 @@
 import sys, os, builtins
 from datetime import datetime
 import inspect
+# 全局开关：是否显示 print 输出
+builtins.__print_show__ = True
 
 def print(
     *args,
@@ -13,6 +15,9 @@ def print(
     style=None,
     prefix=None
 ):
+    # 是否允许打印
+    if hasattr(builtins, "__print_show__") and not builtins.__print_show__:
+        return
     """增强版 print，支持颜色、样式、前缀、位置信息"""
     if sys.platform == "win32":
         os.system("")
@@ -176,3 +181,13 @@ def error(*args, **kwargs):
 def debug(*args, **kwargs):
     """调试输出（青色）"""
     print("[DEBUG]", *args, fg_color="white", **kwargs)
+
+
+def set_show(enable: bool):
+    """设置是否显示 print 输出。可用于开发环境正常输出，生产环境屏蔽输出"""
+    builtins.__print_show__ = bool(enable)
+
+def is_show() -> bool:
+    """返回当前 print 显示状态"""
+    return getattr(builtins, "__print_show__", True)
+

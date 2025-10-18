@@ -160,6 +160,19 @@ class TestMyPrintX(unittest.TestCase):
         self.assertIn("[DEBUG]", out)
         self.assertIn("\033[37", out)  # 白色
 
+    def test_show_toggle(self):
+        """测试 print 输出开关"""
+        myprintx.set_show(False)
+        myprintx.print("这行不应出现")
+        out = self.get_output()
+        self.assertEqual(out, "")  # 应无输出
+
+        myprintx.set_show(True)
+        myprintx.print("这行应该出现")
+        out = self.get_output()
+        self.assertIn("这行应该出现", out)
+
+
 
 # 运行所有测试
 if __name__ == "__main__":

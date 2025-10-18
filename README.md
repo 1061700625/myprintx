@@ -39,6 +39,13 @@ myprintx.print("启动成功", fg_color="green")
 myprintx.print("任务执行中", fg_color="cyan")
 myprintx.unpatch_prefix()  # 关闭前缀
 
+# 控制是否屏蔽所有 print 输出
+myprintx.print("调试输出")  # 正常输出
+myprintx.set_show(False)
+myprintx.print("生产环境不应出现这行")  # 不输出
+myprintx.set_show(True)
+myprintx.print("恢复输出")  # 恢复打印
+
 # 简易快速调用
 import myprintx
 myprintx.patch_prefix(show_location=True)
@@ -51,6 +58,8 @@ myprintx.unpatch_prefix()
 
 ## Publish
 ```bash
+python -m unittest  tests/test_myprintx.py -v
+
 pip install build twine
 python -m build
 twine upload dist/*

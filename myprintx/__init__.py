@@ -8,6 +8,8 @@ from .core import (
     warn,
     error,
     debug,
+    set_show, 
+    is_show
 )
 
 __all__ = [
@@ -20,6 +22,8 @@ __all__ = [
     "warn",
     "error",
     "debug",
+    "set_show",
+    "is_show",
 ]
 
-__version__ = "1.2.0"
+__version__ = "1.0.3"

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="myprintx",
-    version="1.0.2",
+    version="1.0.3",
     author="Hualala",
     author_email="1061700625@qq.com",
     description="An enhanced print function supporting color and text styles.",
