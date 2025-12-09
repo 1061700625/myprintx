@@ -54,15 +54,35 @@ myprintx.warn("配置文件缺少部分字段")
 myprintx.error("数据库连接失败")
 myprintx.debug("缓存刷新完成")
 myprintx.unpatch_prefix()
+
+# mode用法
+import myprintx
+myprintx.print("mode模式调试输出", mode="debug")
+myprintx.debug("简易模式调试输出")
+
 ```
 
-## Publish
+## Pack & Publish
 ```bash
+# test
 python -m unittest  tests/test_myprintx.py -v
 
 pip install build twine
+
+# update version in setup.py
+version="1.0.x"
+
+# package myprintx
 python -m build
+
+# test install (optional)
+pip install dist/myprintx-1.0.x-py3-none-any.whl
+
+# publish to pypi
 twine upload dist/*
+
+# install from pypi
+pip install myprintx --upgrade
 ```
 
 ## Blog
