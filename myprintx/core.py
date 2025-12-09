@@ -13,7 +13,8 @@ def print(
     fg_color=None,
     bg_color=None,
     style=None,
-    prefix=None
+    prefix=None,
+    mode=None,
 ):
     # 是否允许打印
     if hasattr(builtins, "__print_show__") and not builtins.__print_show__:
@@ -21,6 +22,21 @@ def print(
     """增强版 print，支持颜色、样式、前缀、位置信息"""
     if sys.platform == "win32":
         os.system("")
+    
+    if mode:
+        mode = str(mode).lower()
+        # 映射到类似 info/warn/error/debug 的效果
+        mode_map = {
+            "info":  ("[INFO]",  "cyan",   None),
+            "warn":  ("[WARN]",  "yellow", "bold"),
+            "error": ("[ERROR]", "red",    "bold"),
+            "debug": ("[DEBUG]", "white",  None),
+        }
+        if mode not in mode_map: raise ValueError(f"Unknown print mode: {mode}")
+        tag, default_fg, default_style = mode_map[mode]
+        args = (tag, *args)
+        if fg_color is None and default_fg: fg_color = default_fg
+        if style is None and default_style: style = default_style
 
     # ANSI 颜色映射表
     color_map = {
