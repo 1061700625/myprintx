@@ -9,7 +9,11 @@ from .core import (
     error,
     debug,
     set_show, 
-    is_show
+    is_show,
+    show_debug,
+    show_info,
+    show_warn,
+    show_error,
 )
 
 __all__ = [
@@ -24,6 +28,10 @@ __all__ = [
     "debug",
     "set_show",
     "is_show",
+    "show_debug",
+    "show_info",
+    "show_warn",
+    "show_error",
 ]
 
-__version__ = "1.0.3"
+__version__ = "1.0.5"

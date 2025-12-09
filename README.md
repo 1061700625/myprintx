@@ -59,7 +59,14 @@ myprintx.unpatch_prefix()
 import myprintx
 myprintx.print("mode模式调试输出", mode="debug")
 myprintx.debug("简易模式调试输出")
-
+myprintx.show_debug(False) # 只屏蔽 debug
+myprintx.debug("这行不会输出")
+myprintx.print("这行也不会输出", mode="debug")
+myprintx.info("这行仍然会输出")
+myprintx.show_debug() # 恢复 debug
+myprintx.debug("debug 恢复了")
+myprintx.set_show(False) # 一键全关
+myprintx.error("这行也不会输出")
 ```
 
 ## Pack & Publish
@@ -72,11 +79,15 @@ pip install build twine
 # update version in setup.py
 version="1.0.x"
 
+# update version in myprintx/__init__.py
+__version__="1.0.x"
+
 # package myprintx
+rm -rf dist/
 python -m build
 
 # test install (optional)
-pip install dist/myprintx-1.0.x-py3-none-any.whl
+pip install dist/myprintx-1.0.x-py3-none-any.whl --force-reinstall
 
 # publish to pypi
 twine upload dist/*

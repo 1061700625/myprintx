@@ -1,8 +1,14 @@
 import sys, os, builtins
 from datetime import datetime
 import inspect
+
 # 全局开关：是否显示 print 输出
 builtins.__print_show__ = True
+builtins.__show_debug__ = True
+builtins.__show_info__ = True
+builtins.__show_warn__ = True
+builtins.__show_error__ = True
+
 
 def print(
     *args,
@@ -25,7 +31,10 @@ def print(
     
     if mode:
         mode = str(mode).lower()
-        # 映射到类似 info/warn/error/debug 的效果
+        if mode == "debug" and not getattr(builtins, "__show_debug__", True): return
+        if mode == "info" and not getattr(builtins, "__show_info__", True): return
+        if mode == "warn" and not getattr(builtins, "__show_warn__", True): return
+        if mode == "error" and not getattr(builtins, "__show_error__", True): return
         mode_map = {
             "info":  ("[INFO]",  "cyan",   None),
             "warn":  ("[WARN]",  "yellow", "bold"),
@@ -181,26 +190,35 @@ def _with_temp_color(func):
 @_with_temp_color
 def info(*args, **kwargs):
     """信息输出（蓝色）"""
-    print("[INFO]", *args, fg_color="cyan", **kwargs)
+    kwargs.setdefault("mode", "info")
+    print(*args, **kwargs)
 
 @_with_temp_color
 def warn(*args, **kwargs):
     """警告输出（黄色加粗）"""
-    print("[WARN]", *args, fg_color="yellow", style="bold", **kwargs)
+    kwargs.setdefault("mode", "warn")
+    print(*args, **kwargs)
 
 @_with_temp_color
 def error(*args, **kwargs):
     """错误输出（红色加粗）"""
-    print("[ERROR]", *args, fg_color="red", style="bold", **kwargs)
+    kwargs.setdefault("mode", "error")
+    print(*args, **kwargs)
 
 @_with_temp_color
 def debug(*args, **kwargs):
     """调试输出（青色）"""
-    print("[DEBUG]", *args, fg_color="white", **kwargs)
+    kwargs.setdefault("mode", "debug")
+    print(*args, **kwargs)
 
+
+def show_debug(enable: bool=True): builtins.__show_debug__ = bool(enable)
+def show_info(enable: bool=True): builtins.__show_info__   = bool(enable)
+def show_warn(enable: bool=True): builtins.__show_warn__   = bool(enable)
+def show_error(enable: bool=True): builtins.__show_error__ = bool(enable)
 
 def set_show(enable: bool):
-    """设置是否显示 print 输出。可用于开发环境正常输出，生产环境屏蔽输出"""
+    """设置是否显示 print 输出，总开关。可用于开发环境正常输出，生产环境屏蔽输出，包括所有的mode"""
     builtins.__print_show__ = bool(enable)
 
 def is_show() -> bool:
