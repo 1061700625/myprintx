@@ -1,5 +1,7 @@
 import os
-import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import myprintx
 
@@ -11,7 +13,7 @@ def main():
 
     try:
         # 测试 1：不传路径时，使用 logs/时间戳_pid<PID>.log
-        myprintx.patch_log()
+        default_path = myprintx.patch_log()
         myprintx.patch_prefix(
             show_date=False,
             show_time=False,
@@ -22,12 +24,6 @@ def main():
         myprintx.unpatch_log()
         myprintx.unpatch_prefix()
 
-        log_paths = [
-            os.path.join(log_directory, name)
-            for name in os.listdir(log_directory)
-            if re.fullmatch(rf"\d{{8}}_\d{{6}}_pid{os.getpid()}\.log", name)
-        ]
-        default_path = max(log_paths, key=os.path.getmtime)
         with open(default_path, encoding="utf-8") as log_file:
             default_content = log_file.read()
         assert "带颜色的内容" in default_content
@@ -41,9 +37,17 @@ def main():
                 previous_content = log_file.read()
 
         myprintx.patch_color()
-        myprintx.patch_log(custom_path)
+        myprintx.patch_log(
+            custom_path,
+            max_bytes=10 * 1024 * 1024,
+            backup_count=5,
+        )
         print("第一条", fg_color="red")
         print("第二条", fg_color="cyan")
+        try:
+            1 / 0
+        except ZeroDivisionError:
+            myprintx.exception("计算失败")
         myprintx.unpatch_log()
 
         # 日志关闭后仍输出到终端，但不再写文件
@@ -59,7 +63,10 @@ def main():
 
         with open(custom_path, encoding="utf-8") as log_file:
             custom_content = log_file.read()
-        assert custom_content == previous_content + "第一条\n第二条\n"
+        new_content = custom_content[len(previous_content):]
+        assert new_content.startswith("第一条\n第二条\n[ERROR] 计算失败\n")
+        assert "ZeroDivisionError: division by zero" in new_content
+        assert "\033[" not in new_content
     finally:
         myprintx.set_show(True)
         myprintx.unpatch_log()

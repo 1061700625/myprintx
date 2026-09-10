@@ -199,7 +199,7 @@ class TestMyPrintX(unittest.TestCase):
             previous_directory = os.getcwd()
             try:
                 os.chdir(directory)
-                myprintx.patch_log()
+                returned_path = myprintx.patch_log()
                 myprintx.print("默认日志")
             finally:
                 os.chdir(previous_directory)
@@ -212,8 +212,48 @@ class TestMyPrintX(unittest.TestCase):
                 log_names[0],
                 rf"^\d{{8}}_\d{{6}}_pid{os.getpid()}\.log$",
             )
-            with open(os.path.join(log_directory, log_names[0]), encoding="utf-8") as log_file:
+            log_path = os.path.join(log_directory, log_names[0])
+            self.assertEqual(os.path.realpath(returned_path), os.path.realpath(log_path))
+            with open(log_path, encoding="utf-8") as log_file:
                 self.assertEqual(log_file.read(), "默认日志\n")
+
+    def test_patch_log_rotates_by_size_and_backup_count(self):
+        """超过 max_bytes 时应轮转，并且只保留指定数量的备份。"""
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = os.path.join(directory, "app.log")
+            myprintx.patch_log(log_path, max_bytes=7, backup_count=2)
+
+            myprintx.print("111111")
+            myprintx.print("222222")
+            myprintx.print("333333")
+
+            with open(log_path, encoding="utf-8") as log_file:
+                self.assertEqual(log_file.read(), "333333\n")
+            with open(f"{log_path}.1", encoding="utf-8") as log_file:
+                self.assertEqual(log_file.read(), "222222\n")
+            with open(f"{log_path}.2", encoding="utf-8") as log_file:
+                self.assertEqual(log_file.read(), "111111\n")
+
+    def test_exception_outputs_traceback_to_terminal_and_plain_log(self):
+        """exception() 应使用 error 样式，并把无 ANSI traceback 写入日志。"""
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = os.path.join(directory, "app.log")
+            myprintx.patch_log(log_path)
+
+            try:
+                raise RuntimeError("测试异常")
+            except RuntimeError:
+                myprintx.exception("处理失败")
+
+            terminal_output = self.output.getvalue()
+            self.assertIn("\033[1;31m[ERROR] 处理失败", terminal_output)
+            self.assertIn("Traceback (most recent call last):", terminal_output)
+            self.assertIn("RuntimeError: 测试异常", terminal_output)
+            with open(log_path, encoding="utf-8") as log_file:
+                log_output = log_file.read()
+            self.assertNotIn("\033[", log_output)
+            self.assertIn("[ERROR] 处理失败", log_output)
+            self.assertIn("RuntimeError: 测试异常", log_output)
 
     def test_unpatch_log_and_hidden_output_do_not_write(self):
         """关闭日志或关闭总输出后，都不应继续写入文件。"""
@@ -580,7 +620,13 @@ class TestMyPrintX(unittest.TestCase):
         original = builtins.print
         myprintx.patch_color()
         myprintx.patch_color()
-        for helper in (myprintx.info, myprintx.warn, myprintx.error, myprintx.debug):
+        for helper in (
+            myprintx.info,
+            myprintx.warn,
+            myprintx.error,
+            myprintx.exception,
+            myprintx.debug,
+        ):
             with self.subTest(helper=helper.__name__):
                 helper("消息")
                 self.assertIs(builtins.print, myprintx.print)

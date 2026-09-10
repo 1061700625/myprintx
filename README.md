@@ -16,7 +16,7 @@
 
 * ✅ 日志副本 — 保留终端输出，并同步追加一份纯文本日志
 
-* ✅ 快捷输出 — 内置 `info()`、`warn()`、`error()`、`debug()`
+* ✅ 快捷输出 — 内置 `info()`、`warn()`、`error()`、`exception()`、`debug()`
 
 ## 安装
 
@@ -62,7 +62,10 @@ myprintx.print("继续使用自动前缀")
 myprintx.unpatch_prefix()  # 关闭自动前缀
 
 # 同步保存纯文本日志
-myprintx.patch_log()  # 当前目录/logs/YYYYMMDD_HHMMSS_pid<PID>.log
+log_path = myprintx.patch_log(  # 返回日志的绝对路径
+    max_bytes=10 * 1024 * 1024,
+    backup_count=5,
+)
 myprintx.print("终端和日志都会保存这条内容", fg_color="green")
 myprintx.unpatch_log()
 
@@ -100,6 +103,12 @@ myprintx.warn("配置文件缺少部分字段")  # 黄色加粗
 myprintx.error("数据库连接失败")     # 红色加粗
 myprintx.debug("缓存刷新完成")       # 白色
 myprintx.unpatch_prefix()
+
+# 输出当前异常及完整 traceback
+try:
+    1 / 0
+except ZeroDivisionError:
+    myprintx.exception("计算失败")
 
 # mode 用法与分类开关
 myprintx.print("模式调试输出", mode="debug")
@@ -177,11 +186,15 @@ myprintx.set_show(True)
 
 日志文件说明：
 
-* `patch_log(file_path=None)` 开启日志副本；不传路径时，在调用时的当前目录创建 `logs/YYYYMMDD_HHMMSS_pid<PID>.log`。PID 始终包含在默认文件名中，因此多个进程分别调用时不会写入同一个默认文件。传入相对路径时，会在调用时转换为绝对路径。
+* `patch_log(file_path=None, max_bytes=10 * 1024 * 1024, backup_count=5)` 开启日志副本并返回日志文件的绝对路径；不传路径时，在调用时的当前目录创建 `logs/YYYYMMDD_HHMMSS_pid<PID>.log`。PID 始终包含在默认文件名中，因此多个进程分别调用时不会写入同一个默认文件。传入相对路径时，会在调用时转换为绝对路径。
 
 * 日志以 UTF-8 追加写入，自动去除 ANSI 颜色和样式控制码，不影响终端原有输出。默认路径和指定路径缺少父目录时都会自动创建。
 
+* 当前日志在写入下一条内容会超过 `max_bytes` 时轮转，备份依次命名为 `.1`、`.2`，最多保留 `backup_count` 份。传入 `max_bytes=None` 可关闭轮转；单条内容本身超过限制时仍会完整写入。
+
 * `unpatch_log()` 关闭日志记录，不影响终端打印。总开关或分类开关屏蔽的内容不会写入日志；日志配置是进程内状态，多进程需要分别调用 `patch_log()`。如显式传入同一路径，多个进程会共同追加该文件，当前不提供跨进程写锁。
+
+* `exception()` 使用 error 模式输出传入内容，并附加当前异常的完整 traceback；日志副本中会自动移除颜色控制码。
 
 > 全局接管与兼容性：`patch_color()` 可重复调用，快捷函数不会破坏接管状态。它会影响当前解释器后续通过 `builtins.print` 输出的调用，但不影响提前保存的函数引用、`sys.stdout.write()` 等独立输出。
 >

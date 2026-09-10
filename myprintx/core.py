@@ -3,8 +3,27 @@ from datetime import datetime
 import inspect
 import multiprocessing
 import re
+import traceback
 
 _ANSI_ESCAPE_RE = re.compile(r"\033\[[0-9;]*m")
+
+
+def _rotate_log(log_path, incoming_size, max_bytes, backup_count):
+    if (
+        max_bytes is None
+        or backup_count <= 0
+        or not os.path.exists(log_path)
+        or os.path.getsize(log_path) + incoming_size <= max_bytes
+    ):
+        return
+
+    for index in range(backup_count, 0, -1):
+        source = log_path if index == 1 else f"{log_path}.{index - 1}"
+        target = f"{log_path}.{index}"
+        if os.path.exists(source):
+            if index == backup_count and os.path.exists(target):
+                os.remove(target)
+            os.replace(source, target)
 
 _ANSI_COLORS = {
     "black": 30,
@@ -211,16 +230,20 @@ def print(
     native_print = getattr(builtins, "__orig_print__", builtins.print)
     native_print(output, sep=sep, end=end, file=file, flush=flush)
 
-    log_path = getattr(builtins, "__print_log__", None)
-    if log_path:
+    log_config = getattr(builtins, "__print_log__", None)
+    if log_config:
+        log_text = _ANSI_ESCAPE_RE.sub("", output) + ("\n" if end is None else end)
+        log_path = log_config["path"]
+        _rotate_log(
+            log_path,
+            len(log_text.encode("utf-8")),
+            log_config["max_bytes"],
+            log_config["backup_count"],
+        )
         with open(log_path, "a", encoding="utf-8") as log_file:
-            native_print(
-                _ANSI_ESCAPE_RE.sub("", output),
-                sep=sep,
-                end=end,
-                file=log_file,
-                flush=flush,
-            )
+            log_file.write(log_text)
+            if flush:
+                log_file.flush()
 
 
 def patch_color():
@@ -237,14 +260,19 @@ def unpatch_color():
         del builtins.__orig_print__
 
 
-def patch_log(file_path=None):
-    """开启日志文件记录；默认在当前目录的 logs 中按时间和 PID 命名。"""
+def patch_log(file_path=None, max_bytes=10 * 1024 * 1024, backup_count=5):
+    """开启日志记录并返回绝对路径，默认按 10 MB、5 份备份轮转。"""
     if file_path is None:
         file_name = datetime.now().strftime(f"%Y%m%d_%H%M%S_pid{os.getpid()}.log")
         file_path = os.path.join("logs", file_name)
     log_path = os.path.abspath(os.fspath(file_path))
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
-    builtins.__print_log__ = log_path
+    builtins.__print_log__ = {
+        "path": log_path,
+        "max_bytes": max_bytes,
+        "backup_count": backup_count,
+    }
+    return log_path
 
 
 def unpatch_log():
@@ -300,6 +328,16 @@ def warn(*args, **kwargs):
 def error(*args, **kwargs):
     """错误输出（红色加粗）"""
     kwargs.setdefault("mode", "error")
+    print(*args, **kwargs)
+
+def exception(*args, **kwargs):
+    """错误输出，并附加当前异常的 traceback。"""
+    traceback_text = traceback.format_exc().rstrip("\n")
+    kwargs.setdefault("mode", "error")
+    if args:
+        args = (*args[:-1], f"{args[-1]}\n{traceback_text}")
+    else:
+        args = (traceback_text,)
     print(*args, **kwargs)
 
 def debug(*args, **kwargs):
