@@ -2,6 +2,8 @@ from .core import (
     print,
     patch_color,
     unpatch_color,
+    patch_log,
+    unpatch_log,
     patch_prefix,
     unpatch_prefix,
     info,
@@ -20,6 +22,8 @@ __all__ = [
     "print",
     "patch_color",
     "unpatch_color",
+    "patch_log",
+    "unpatch_log",
     "patch_prefix",
     "unpatch_prefix",
     "info",
@@ -34,4 +38,4 @@ __all__ = [
     "show_error",
 ]
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"

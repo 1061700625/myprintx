@@ -12,7 +12,9 @@
 
 * ✅ 全局接管 — 一行启用，让后续普通 `print()` 使用增强功能
 
-* ✅ 自动前缀 — 显示日期、时间、自定义标签和调用位置
+* ✅ 自动前缀 — 显示日期、时间、进程 ID、自定义标签和调用位置
+
+* ✅ 日志副本 — 保留终端输出，并同步追加一份纯文本日志
 
 * ✅ 快捷输出 — 内置 `info()`、`warn()`、`error()`、`debug()`
 
@@ -59,6 +61,15 @@ myprintx.print("本次不显示前缀", prefix="", fg_color="orange")
 myprintx.print("继续使用自动前缀")
 myprintx.unpatch_prefix()  # 关闭自动前缀
 
+# 同步保存纯文本日志
+myprintx.patch_log()  # 当前目录/logs/YYYYMMDD_HHMMSS_pid<PID>.log
+myprintx.print("终端和日志都会保存这条内容", fg_color="green")
+myprintx.unpatch_log()
+
+myprintx.patch_log("logs/app.log")  # 指定路径，已有文件会继续追加
+myprintx.print("写入指定日志")
+myprintx.unpatch_log()
+
 # 全局接管与自动前缀一起使用
 myprintx.patch_color()
 myprintx.patch_prefix(
@@ -66,6 +77,7 @@ myprintx.patch_prefix(
     show_time=True,
     custom_prefix="应用",
     show_location=True,
+    show_pid=None,
 )
 try:
     print("带前缀的普通打印", fg_color="green")
@@ -149,6 +161,10 @@ myprintx.set_show(True)
 
 * `patch_prefix()` 默认显示日期和时间，可用 `show_date=False`、`show_time=False` 分别关闭；`show_location` 默认关闭。位置显示第一个 `myprintx.core` 外部调用者的文件名、函数名和行号。
 
+* `show_pid=None` 时，单进程默认不显示 PID；使用 `multiprocessing` 时，主进程存在活动子进程以及子进程自身都会显示黄色的 `pid=xxx`。`show_pid=True` 始终显示，`show_pid=False` 在主、子进程中都不显示；当前不检测 `subprocess.Popen` 和多线程。
+
+* 自动前缀各部分使用 ` | ` 分隔，顺序为日期时间、进程 ID、自定义标签、调用位置；未启用的部分会被省略。
+
 * 日期和时间为绿色，位置为蓝色。正文的颜色和样式不改变自动前缀颜色；手动 ANSI 前缀会在需要时补充重置码，避免颜色延续到正文。
 
 * `prefix=None` 使用自动前缀，`prefix=""` 关闭本次前缀，其他值覆盖本次前缀，均不改变全局配置。
@@ -158,6 +174,14 @@ myprintx.set_show(True)
 * 快捷函数无需全局接管即可使用。前缀和显示开关为全局共享配置；开关影响增强输出及接管后的普通 `print()`，不影响未接管的原生打印。
 
 * `is_show()` 只查询总开关。恢复总开关不会自动恢复已关闭的分类开关；被屏蔽的输出提前返回，不进行颜色校验。
+
+日志文件说明：
+
+* `patch_log(file_path=None)` 开启日志副本；不传路径时，在调用时的当前目录创建 `logs/YYYYMMDD_HHMMSS_pid<PID>.log`。PID 始终包含在默认文件名中，因此多个进程分别调用时不会写入同一个默认文件。传入相对路径时，会在调用时转换为绝对路径。
+
+* 日志以 UTF-8 追加写入，自动去除 ANSI 颜色和样式控制码，不影响终端原有输出。默认路径和指定路径缺少父目录时都会自动创建。
+
+* `unpatch_log()` 关闭日志记录，不影响终端打印。总开关或分类开关屏蔽的内容不会写入日志；日志配置是进程内状态，多进程需要分别调用 `patch_log()`。如显式传入同一路径，多个进程会共同追加该文件，当前不提供跨进程写锁。
 
 > 全局接管与兼容性：`patch_color()` 可重复调用，快捷函数不会破坏接管状态。它会影响当前解释器后续通过 `builtins.print` 输出的调用，但不影响提前保存的函数引用、`sys.stdout.write()` 等独立输出。
 >

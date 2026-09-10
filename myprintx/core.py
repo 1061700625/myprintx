@@ -1,6 +1,10 @@
 import sys, os, builtins
 from datetime import datetime
 import inspect
+import multiprocessing
+import re
+
+_ANSI_ESCAPE_RE = re.compile(r"\033\[[0-9;]*m")
 
 _ANSI_COLORS = {
     "black": 30,
@@ -141,6 +145,7 @@ def print(
         # 🟢 日期 + 时间（绿色）
         green = "\033[32m"
         blue = "\033[34m"
+        yellow = "\033[33m"
         reset = "\033[0m"
 
         dt_parts = []
@@ -150,6 +155,18 @@ def print(
             dt_parts.append(datetime.now().strftime("%H:%M:%S"))
         if dt_parts:
             parts.append(f"{green}{' '.join(dt_parts)}{reset}")
+
+        show_pid = cfg.get("show_pid")
+        if show_pid is None:
+            parent_process = getattr(multiprocessing, "parent_process", None)
+            is_child_process = (
+                parent_process() is not None
+                if parent_process
+                else multiprocessing.current_process().name != "MainProcess"
+            )
+            show_pid = is_child_process or bool(multiprocessing.active_children())
+        if show_pid:
+            parts.append(f"{yellow}pid={os.getpid()}{reset}")
 
         # ⚪ 自定义前缀（默认颜色）
         if cfg.get("custom_prefix"):
@@ -170,14 +187,18 @@ def print(
             finally:
                 del frame
 
-        prefix_text = " ".join(parts)
+        prefix_text = " | ".join(parts)
 
     # 手动 prefix 参数优先
     if prefix is not None: prefix_text = str(prefix)
     # 分离前缀和正文的颜色区域
     if prefix_text:
-        # 保持前缀原有颜色（由 patch_prefix 内部定义）
-        prefix_reset = "\033[0m" if "\033[" in prefix_text and not prefix_text.endswith("\033[0m") else ""
+        # 自动前缀的彩色段已自行重置；仅为手动 ANSI 前缀补重置码
+        prefix_reset = (
+            "\033[0m"
+            if prefix is not None and "\033[" in prefix_text and not prefix_text.endswith("\033[0m")
+            else ""
+        )
         text = f"[{prefix_text}{prefix_reset}] {prefix_code}{text}{suffix_code}"
     else:
         # 没有前缀时，正常加色
@@ -187,10 +208,19 @@ def print(
 
 
 
-    if hasattr(builtins, "__orig_print__"):
-        builtins.__orig_print__(output, sep=sep, end=end, file=file, flush=flush)
-    else:
-        builtins.print(output, sep=sep, end=end, file=file, flush=flush)
+    native_print = getattr(builtins, "__orig_print__", builtins.print)
+    native_print(output, sep=sep, end=end, file=file, flush=flush)
+
+    log_path = getattr(builtins, "__print_log__", None)
+    if log_path:
+        with open(log_path, "a", encoding="utf-8") as log_file:
+            native_print(
+                _ANSI_ESCAPE_RE.sub("", output),
+                sep=sep,
+                end=end,
+                file=log_file,
+                flush=flush,
+            )
 
 
 def patch_color():
@@ -207,26 +237,44 @@ def unpatch_color():
         del builtins.__orig_print__
 
 
-def patch_prefix(show_date=True, show_time=True, custom_prefix=None, show_location=False):
+def patch_log(file_path=None):
+    """开启日志文件记录；默认在当前目录的 logs 中按时间和 PID 命名。"""
+    if file_path is None:
+        file_name = datetime.now().strftime(f"%Y%m%d_%H%M%S_pid{os.getpid()}.log")
+        file_path = os.path.join("logs", file_name)
+    log_path = os.path.abspath(os.fspath(file_path))
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    builtins.__print_log__ = log_path
+
+
+def unpatch_log():
+    """关闭日志文件记录。"""
+    if hasattr(builtins, "__print_log__"):
+        del builtins.__print_log__
+
+
+def patch_prefix(show_date=True, show_time=True, custom_prefix=None, show_location=False, show_pid=None):
     """
-    启用自动前缀（日期/时间/自定义/位置信息）
+    启用自动前缀（日期/时间/进程 ID/自定义/位置信息）
     --------------------------------------
     参数：
         show_date: 是否显示日期（默认 True）
         show_time: 是否显示时间（默认 True）
         custom_prefix: 自定义前缀文字（默认 None）
         show_location: 是否显示调用位置（文件、函数、行号，默认 False）
+        show_pid: 是否显示进程 ID。None 时仅在 multiprocessing 多进程中显示
     示例：
         >>> import myprintx
         >>> myprintx.patch_prefix(custom_prefix="INFO", show_location=True)
         >>> print("启动完成")
-        [2025-10-14 21:55:07 INFO main.py:<module>():8] 启动完成
+        [2025-10-14 21:55:07 | INFO | main.py:<module>():8] 启动完成
     """
     builtins.__print_prefix__ = {
         "show_date": show_date,
         "show_time": show_time,
         "custom_prefix": custom_prefix,
-        "show_location": show_location
+        "show_location": show_location,
+        "show_pid": show_pid,
     }
 
 

@@ -4,9 +4,26 @@ import builtins
 import unittest
 import inspect
 import itertools
+import multiprocessing
 import os
+import tempfile
 from datetime import datetime
 import myprintx
+
+
+def _print_prefix_in_child(output_queue, ready, release, show_pid):
+    """在真实 multiprocessing 子进程中生成一条前缀输出。"""
+    output = io.StringIO()
+    myprintx.patch_prefix(
+        show_date=False,
+        show_time=False,
+        custom_prefix="子进程",
+        show_pid=show_pid,
+    )
+    ready.set()
+    release.wait(5)
+    myprintx.print("正文", file=output)
+    output_queue.put((os.getpid(), output.getvalue()))
 
 
 class TestMyPrintX(unittest.TestCase):
@@ -15,6 +32,7 @@ class TestMyPrintX(unittest.TestCase):
         """保存调用环境，每项测试从独立的默认状态开始。"""
         self._state_names = (
             "print", "__orig_print__", "__print_prefix__", "__print_show__",
+            "__print_log__",
             "__show_debug__", "__show_info__", "__show_warn__", "__show_error__",
         )
         self._saved_state = {
@@ -25,6 +43,7 @@ class TestMyPrintX(unittest.TestCase):
         self.addCleanup(self.restore_environment)
         myprintx.unpatch_color()
         myprintx.unpatch_prefix()
+        myprintx.unpatch_log()
         myprintx.set_show(True)
         for setter in (myprintx.show_debug, myprintx.show_info,
                        myprintx.show_warn, myprintx.show_error):
@@ -149,6 +168,68 @@ class TestMyPrintX(unittest.TestCase):
                 self.assertEqual(output.getvalue(), "BODY\n")
                 self.assertEqual(self.output.getvalue(), "")
 
+    def test_patch_log_mirrors_plain_text_and_appends(self):
+        """日志应保留终端输出，同时以纯文本追加到指定文件。"""
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = os.path.join(directory, "nested", "app.log")
+            myprintx.patch_log(log_path)
+            self.assertTrue(os.path.isdir(os.path.dirname(log_path)))
+            myprintx.patch_prefix(
+                show_date=False,
+                show_time=False,
+                custom_prefix="应用",
+                show_pid=True,
+            )
+
+            myprintx.print("第一条", fg_color="red")
+            myprintx.print("第二条", fg_color="green")
+
+            self.assertIn("\033[31m第一条\033[0m", self.output.getvalue())
+            self.assertIn("\033[32m第二条\033[0m", self.output.getvalue())
+            with open(log_path, encoding="utf-8") as log_file:
+                self.assertEqual(
+                    log_file.read(),
+                    f"[pid={os.getpid()} | 应用] 第一条\n"
+                    f"[pid={os.getpid()} | 应用] 第二条\n",
+                )
+
+    def test_patch_log_default_path_uses_logs_directory_timestamp_and_pid(self):
+        """默认日志应放入 logs 目录，且文件名包含时间戳和 PID。"""
+        with tempfile.TemporaryDirectory() as directory:
+            previous_directory = os.getcwd()
+            try:
+                os.chdir(directory)
+                myprintx.patch_log()
+                myprintx.print("默认日志")
+            finally:
+                os.chdir(previous_directory)
+
+            log_directory = os.path.join(directory, "logs")
+            self.assertTrue(os.path.isdir(log_directory))
+            log_names = os.listdir(log_directory)
+            self.assertEqual(len(log_names), 1)
+            self.assertRegex(
+                log_names[0],
+                rf"^\d{{8}}_\d{{6}}_pid{os.getpid()}\.log$",
+            )
+            with open(os.path.join(log_directory, log_names[0]), encoding="utf-8") as log_file:
+                self.assertEqual(log_file.read(), "默认日志\n")
+
+    def test_unpatch_log_and_hidden_output_do_not_write(self):
+        """关闭日志或关闭总输出后，都不应继续写入文件。"""
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = os.path.join(directory, "app.log")
+            myprintx.patch_log(log_path)
+            myprintx.print("保留")
+            myprintx.unpatch_log()
+            myprintx.print("日志已关闭")
+            myprintx.patch_log(log_path)
+            myprintx.set_show(False)
+            myprintx.print("总开关已关闭")
+
+            with open(log_path, encoding="utf-8") as log_file:
+                self.assertEqual(log_file.read(), "保留\n")
+
     def test_empty_prefix_only_disables_current_prefix(self):
         myprintx.patch_prefix(show_date=False, show_time=False, custom_prefix="AUTO")
         myprintx.print("BODY", prefix="", fg_color="red")
@@ -173,6 +254,97 @@ class TestMyPrintX(unittest.TestCase):
         out = self.get_output()
         self.assertIn("INFO", out)
         self.assertIn("初始化完成", out)
+
+    def test_show_pid_true_uses_yellow_segment_and_pipe_separator(self):
+        """显式开启时，PID 应作为黄色独立段插入前缀。"""
+        myprintx.patch_prefix(
+            show_date=False,
+            show_time=False,
+            custom_prefix="应用",
+            show_pid=True,
+        )
+        myprintx.print("正文")
+
+        self.assertEqual(
+            self.output.getvalue(),
+            f"[\033[33mpid={os.getpid()}\033[0m | 应用] 正文\n",
+        )
+
+    def test_show_pid_none_hides_in_single_process(self):
+        """默认自动模式在没有活动子进程时不显示 PID。"""
+        myprintx.patch_prefix(
+            show_date=False,
+            show_time=False,
+            custom_prefix="应用",
+            show_pid=None,
+        )
+        myprintx.print("正文")
+
+        self.assertEqual(self.output.getvalue(), "[应用] 正文\n")
+
+    def test_show_pid_none_displays_in_main_and_child_process(self):
+        """默认自动模式在 multiprocessing 主、子进程中都显示 PID。"""
+        context = multiprocessing.get_context("spawn")
+        output_queue = context.Queue()
+        ready = context.Event()
+        release = context.Event()
+        process = context.Process(
+            target=_print_prefix_in_child,
+            args=(output_queue, ready, release, None),
+        )
+        process.start()
+        self.addCleanup(lambda: process.is_alive() and process.terminate())
+        self.assertTrue(ready.wait(5))
+
+        myprintx.patch_prefix(
+            show_date=False,
+            show_time=False,
+            custom_prefix="主进程",
+            show_pid=None,
+        )
+        myprintx.print("正文")
+        release.set()
+        child_pid, child_output = output_queue.get(timeout=5)
+        process.join(5)
+
+        self.assertEqual(process.exitcode, 0)
+        self.assertEqual(
+            self.output.getvalue(),
+            f"[\033[33mpid={os.getpid()}\033[0m | 主进程] 正文\n",
+        )
+        self.assertEqual(
+            child_output,
+            f"[\033[33mpid={child_pid}\033[0m | 子进程] 正文\n",
+        )
+
+    def test_show_pid_false_hides_in_main_and_child_process(self):
+        """显式关闭时，multiprocessing 主、子进程都不显示 PID。"""
+        context = multiprocessing.get_context("spawn")
+        output_queue = context.Queue()
+        ready = context.Event()
+        release = context.Event()
+        process = context.Process(
+            target=_print_prefix_in_child,
+            args=(output_queue, ready, release, False),
+        )
+        process.start()
+        self.addCleanup(lambda: process.is_alive() and process.terminate())
+        self.assertTrue(ready.wait(5))
+
+        myprintx.patch_prefix(
+            show_date=False,
+            show_time=False,
+            custom_prefix="主进程",
+            show_pid=False,
+        )
+        myprintx.print("正文")
+        release.set()
+        _, child_output = output_queue.get(timeout=5)
+        process.join(5)
+
+        self.assertEqual(process.exitcode, 0)
+        self.assertEqual(self.output.getvalue(), "[主进程] 正文\n")
+        self.assertEqual(child_output, "[子进程] 正文\n")
 
     def test_manual_prefix_argument(self):
         """测试手动 prefix 参数（覆盖自动前缀）"""
