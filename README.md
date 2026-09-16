@@ -18,6 +18,8 @@
 
 * ✅ 快捷输出 — 内置 `info()`、`warn()`、`error()`、`exception()`、`debug()`
 
+* ✅ 运行计时 — 支持上下文管理器、手动开始/结束和函数装饰器
+
 ## 安装
 
 ```bash
@@ -110,6 +112,23 @@ try:
 except ZeroDivisionError:
     myprintx.exception("计算失败")
 
+# 上下文管理器计时
+with myprintx.timer("数据处理") as timing:
+    data = sum(range(1000))
+print(timing.elapsed)  # 秒数 float
+
+# 手动开始和结束计时
+myprintx.timer_start("下载")
+result = sum(range(1000))
+elapsed = myprintx.timer_end("下载")
+
+# 装饰器计时
+@myprintx.timer("计算")
+def calculate():
+    return sum(range(1000))
+
+calculate()
+
 # mode 用法与分类开关
 myprintx.print("模式调试输出", mode="debug")
 myprintx.debug("快捷调试输出")
@@ -195,6 +214,16 @@ myprintx.set_show(True)
 * `unpatch_log()` 关闭日志记录，不影响终端打印。总开关或分类开关屏蔽的内容不会写入日志；日志配置是进程内状态，多进程需要分别调用 `patch_log()`。如显式传入同一路径，多个进程会共同追加该文件，当前不提供跨进程写锁。
 
 * `exception()` 使用 error 模式输出传入内容，并附加当前异常的完整 traceback；日志副本中会自动移除颜色控制码。
+
+计时功能说明：
+
+* `timer(name)` 同时支持上下文管理器和同步函数装饰器，使用 `time.perf_counter()` 计算耗时；上下文结束后可通过 `timing.elapsed` 读取秒数。
+
+* `timer_start(name)` 启动命名计时器，`timer_end(name)` 输出结果并返回耗时秒数。重复启动同名计时器或结束未启动的计时器会抛出 `RuntimeError`。
+
+* 计时结果格式为 `[TIMER] 名称 | 耗时 1.235 秒`。发生异常时仍会输出耗时，原异常继续抛出；计时输出同样受前缀、日志副本和 `set_show()` 控制。
+
+* 手动计时状态保存在当前进程内，多进程需要分别开始和结束；装饰器当前仅支持同步函数。
 
 > 全局接管与兼容性：`patch_color()` 可重复调用，快捷函数不会破坏接管状态。它会影响当前解释器后续通过 `builtins.print` 输出的调用，但不影响提前保存的函数引用、`sys.stdout.write()` 等独立输出。
 >

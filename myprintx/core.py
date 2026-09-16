@@ -6,6 +6,7 @@ import re
 import traceback
 
 _ANSI_ESCAPE_RE = re.compile(r"\033\[[0-9;]*m")
+_WINDOWS_ANSI_INITIALIZED = False
 
 
 def _rotate_log(log_path, incoming_size, max_bytes, backup_count):
@@ -111,12 +112,15 @@ def print(
     prefix=None,
     mode=None,
 ):
+    global _WINDOWS_ANSI_INITIALIZED
+
     # 是否允许打印
     if hasattr(builtins, "__print_show__") and not builtins.__print_show__:
         return
     """增强版 print，支持颜色、样式、前缀、位置信息"""
-    if sys.platform == "win32":
+    if sys.platform == "win32" and not _WINDOWS_ANSI_INITIALIZED:
         os.system("")
+        _WINDOWS_ANSI_INITIALIZED = True
     
     if mode:
         mode = str(mode).lower()

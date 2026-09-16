@@ -18,6 +18,7 @@ from .core import (
     show_warn,
     show_error,
 )
+from .timing import timer, timer_start, timer_end
 
 __all__ = [
     "print",
@@ -38,6 +39,9 @@ __all__ = [
     "show_info",
     "show_warn",
     "show_error",
+    "timer",
+    "timer_start",
+    "timer_end",
 ]
 
-__version__ = "1.1.2"
+__version__ = "1.1.3"

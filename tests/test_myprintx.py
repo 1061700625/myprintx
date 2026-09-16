@@ -8,6 +8,7 @@ import multiprocessing
 import os
 import tempfile
 from datetime import datetime
+from unittest import mock
 import myprintx
 
 
@@ -71,6 +72,15 @@ class TestMyPrintX(unittest.TestCase):
         myprintx.print("Hello World")
         out = self.get_output()
         self.assertIn("Hello World", out)
+
+    def test_windows_ansi_initialization_runs_only_once(self):
+        """Windows ANSI 初始化不应为每条输出重复启动 cmd.exe。"""
+        with mock.patch.object(sys, "platform", "win32"), \
+             mock.patch.object(os, "system") as system:
+            myprintx.print("第一条")
+            myprintx.print("第二条")
+
+        system.assert_called_once_with("")
 
     def test_color_and_style(self):
         """测试彩色和样式打印"""
