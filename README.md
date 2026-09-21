@@ -10,7 +10,7 @@
 
 * ✅ 常用参数 — 支持 `sep`、`end`、`file` 和 `flush`
 
-* ✅ 格式化输出 — `format="json"` 美化 JSON，`format="list"` 美化列表/元组
+* ✅ 格式化输出 — `format="json"` 美化 JSON，`format="list"` 美化列表/元组，`format="auto"` 自动判断类型
 
 * ✅ 全局接管 — 一行启用，让后续普通 `print()` 使用增强功能
 
@@ -48,6 +48,8 @@
     myprintx.print({"name": "demo", "items": [1, 2]}, format="json")
     myprintx.print('{"name":"demo","items":[1,2]}', format="json")
     myprintx.print(["apple", "banana", {"count": 2}], format="list")
+    myprintx.print({"name": "demo", "items": [1, 2]}, format="auto")  # dict 自动按 JSON 美化
+    myprintx.print(["apple", "banana"], format="auto")                 # list 自动按列表美化
 
     # 启用彩色全局打印
     myprintx.patch_color()
@@ -184,7 +186,7 @@
 
 * `mode` 支持 `info`、`warn`、`error`、`debug`，不区分大小写。不支持的非空模式会抛出 `ValueError`。使用模式时，`fg_color=None`、`style=None` 采用模式默认值。
 
-* `format` 支持 `json` 和 `list`，不区分大小写。`format="json"` 会用 2 空格缩进美化 Python JSON 可序列化对象，也会先解析 JSON 字符串；普通非 JSON 字符串保持原样。`format="list"` 会将列表或元组按元素分行显示，其他参数保持普通字符串输出。不支持的非空格式会抛出 `ValueError`。
+* `format` 支持 `json`、`list` 和 `auto`，不区分大小写。`format="json"` 会用 2 空格缩进美化 Python JSON 可序列化对象，也会先解析 JSON 字符串；普通非 JSON 字符串保持原样。`format="list"` 会将列表或元组按元素分行显示，其他参数保持普通字符串输出。`format="auto"` 会对 `dict` 使用 JSON 美化，对 `list`/`tuple` 使用列表美化，对可解析的 JSON 字符串使用 JSON 美化，其他类型保持普通输出。不支持的非空格式会抛出 `ValueError`。
 
 * `sep=None` 等同于空格，`end=None` 使用默认换行；`file=None` 使用当前标准输出，其他输出对象直接传给原生 `print()`。
 

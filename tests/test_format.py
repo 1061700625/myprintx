@@ -76,6 +76,56 @@ class PrintFormatTest(unittest.TestCase):
 
         self.assertEqual(output.getvalue(), "label [\n  1,\n  2\n]\n")
 
+    def test_auto_format_pretty_prints_dict_as_json(self):
+        output = io.StringIO()
+        value = {"name": "测试", "items": [1, 2]}
+
+        myprintx.print(value, format="auto", file=output)
+
+        expected = json.dumps(value, ensure_ascii=False, indent=2) + "\n"
+        self.assertEqual(output.getvalue(), expected)
+
+    def test_auto_format_pretty_prints_list(self):
+        output = io.StringIO()
+
+        myprintx.print([1, "two", {"three": 3}], format="AUTO", file=output)
+
+        self.assertEqual(
+            output.getvalue(),
+            "[\n  1,\n  'two',\n  {'three': 3}\n]\n",
+        )
+
+    def test_auto_format_pretty_prints_tuple(self):
+        output = io.StringIO()
+
+        myprintx.print((1, 2), format="auto", file=output)
+
+        self.assertEqual(output.getvalue(), "(\n  1,\n  2\n)\n")
+
+    def test_auto_format_pretty_prints_json_string(self):
+        output = io.StringIO()
+
+        myprintx.print('{"name":"demo","items":[1,2]}', format="auto", file=output)
+
+        self.assertEqual(
+            output.getvalue(),
+            '{\n  "name": "demo",\n  "items": [\n    1,\n    2\n  ]\n}\n',
+        )
+
+    def test_auto_format_pretty_prints_json_array_string(self):
+        output = io.StringIO()
+
+        myprintx.print('[1,"two"]', format="auto", file=output)
+
+        self.assertEqual(output.getvalue(), '[\n  1,\n  "two"\n]\n')
+
+    def test_auto_format_keeps_plain_string_and_scalar(self):
+        output = io.StringIO()
+
+        myprintx.print("plain text", 123, format="auto", file=output)
+
+        self.assertEqual(output.getvalue(), "plain text 123\n")
+
     def test_unknown_format_raises_before_output(self):
         output = io.StringIO()
 

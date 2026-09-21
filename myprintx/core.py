@@ -138,6 +138,20 @@ def _format_list_value(value):
     return "\n".join(lines)
 
 
+def _format_auto_value(value):
+    if isinstance(value, dict):
+        return _format_json_value(value)
+    if isinstance(value, (list, tuple)):
+        return _format_list_value(value)
+    if isinstance(value, str):
+        try:
+            json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return value
+        return _format_json_value(value)
+    return str(value)
+
+
 def _format_print_args(args, output_format):
     if output_format is None:
         return args
@@ -147,6 +161,8 @@ def _format_print_args(args, output_format):
         return tuple(_format_json_value(arg) for arg in args)
     if output_format == "list":
         return tuple(_format_list_value(arg) for arg in args)
+    if output_format == "auto":
+        return tuple(_format_auto_value(arg) for arg in args)
     raise ValueError(f"Unknown print format: {output_format}")
 
 
