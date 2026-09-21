@@ -119,8 +119,6 @@ class LogMultiprocessTest(unittest.TestCase):
                     myprintx.patch_log(suffix="a/b")
                 with self.assertRaises(ValueError):
                     myprintx.patch_log(suffix="a\\b")
-                with self.assertRaises(TypeError):
-                    myprintx.patch_log(suffix=123)
                 self.assertNotIn(_LOG_ROOT_ENV, os.environ)
             finally:
                 os.chdir(old_cwd)

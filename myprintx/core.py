@@ -1,4 +1,6 @@
 import sys, os, builtins
+import json
+import pprint
 from datetime import datetime
 import inspect
 import multiprocessing
@@ -100,6 +102,54 @@ def _color_code(color, background=False):
     return f"{channel};2;{rgb[0]};{rgb[1]};{rgb[2]}"
 
 
+def _format_json_value(value):
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return value
+    try:
+        return json.dumps(value, ensure_ascii=False, indent=2)
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _format_list_value(value):
+    if not isinstance(value, (list, tuple)):
+        return str(value)
+
+    if isinstance(value, tuple):
+        opening, closing = "(", ")"
+    else:
+        opening, closing = "[", "]"
+
+    if not value:
+        return opening + closing
+
+    lines = [opening]
+    for index, item in enumerate(value):
+        item_text = pprint.pformat(item, indent=2, width=88, compact=False)
+        item_lines = item_text.splitlines() or [""]
+        item_lines = [f"  {line}" for line in item_lines]
+        if index < len(value) - 1:
+            item_lines[-1] += ","
+        lines.extend(item_lines)
+    lines.append(closing)
+    return "\n".join(lines)
+
+
+def _format_print_args(args, output_format):
+    if output_format is None:
+        return args
+
+    output_format = str(output_format).lower()
+    if output_format == "json":
+        return tuple(_format_json_value(arg) for arg in args)
+    if output_format == "list":
+        return tuple(_format_list_value(arg) for arg in args)
+    raise ValueError(f"Unknown print format: {output_format}")
+
+
 def print(
     *args,
     sep=' ',
@@ -111,6 +161,7 @@ def print(
     style=None,
     prefix=None,
     mode=None,
+    format=None,
 ):
     global _WINDOWS_ANSI_INITIALIZED
 
@@ -154,6 +205,8 @@ def print(
 
     prefix_code = f"\033[{';'.join(codes)}m" if codes else ''
     suffix_code = "\033[0m" if codes else ''
+
+    args = _format_print_args(args, format)
 
     if sep is None:
         sep = ' '
@@ -265,8 +318,7 @@ def unpatch_color():
 def _get_default_log_path(suffix=None):
     suffix_part = ""
     if suffix is not None:
-        if not isinstance(suffix, str):
-            raise TypeError("suffix must be a string or None")
+        suffix = str(suffix)
         if "\x00" in suffix or "/" in suffix or "\\" in suffix:
             raise ValueError("suffix must not contain path separators")
         if suffix:
@@ -286,7 +338,7 @@ def _get_default_log_path(suffix=None):
 def patch_log(file_path=None, max_bytes=10 * 1024 * 1024, backup_count=5, suffix=None):
     """开启日志记录并返回绝对路径，默认按 10 MB、5 份备份轮转。
 
-    suffix 仅用于默认日志路径，非空时追加在 PID 后、.log 前。
+    suffix 仅用于默认日志路径；非 None 值会先转为字符串，非空时追加在 PID 后、.log 前。
     显式传入 file_path 时，file_path 保持原样，suffix 不参与路径生成。
     """
     if file_path is None:

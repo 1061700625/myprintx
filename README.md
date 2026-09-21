@@ -10,6 +10,8 @@
 
 * ✅ 常用参数 — 支持 `sep`、`end`、`file` 和 `flush`
 
+* ✅ 格式化输出 — `format="json"` 美化 JSON，`format="list"` 美化列表/元组
+
 * ✅ 全局接管 — 一行启用，让后续普通 `print()` 使用增强功能
 
 * ✅ 自动前缀 — 显示日期、时间、进程 ID、自定义标签和调用位置
@@ -41,6 +43,11 @@
     myprintx.print("十六进制颜色", fg_color="#FF8800")
     myprintx.print("RGB 颜色", fg_color=(255, 136, 0))
     myprintx.print("自定义背景", fg_color="white", bg_color=(16, 32, 48))
+
+    # 格式化输出
+    myprintx.print({"name": "demo", "items": [1, 2]}, format="json")
+    myprintx.print('{"name":"demo","items":[1,2]}', format="json")
+    myprintx.print(["apple", "banana", {"count": 2}], format="list")
 
     # 启用彩色全局打印
     myprintx.patch_color()
@@ -177,6 +184,8 @@
 
 * `mode` 支持 `info`、`warn`、`error`、`debug`，不区分大小写。不支持的非空模式会抛出 `ValueError`。使用模式时，`fg_color=None`、`style=None` 采用模式默认值。
 
+* `format` 支持 `json` 和 `list`，不区分大小写。`format="json"` 会用 2 空格缩进美化 Python JSON 可序列化对象，也会先解析 JSON 字符串；普通非 JSON 字符串保持原样。`format="list"` 会将列表或元组按元素分行显示，其他参数保持普通字符串输出。不支持的非空格式会抛出 `ValueError`。
+
 * `sep=None` 等同于空格，`end=None` 使用默认换行；`file=None` 使用当前标准输出，其他输出对象直接传给原生 `print()`。
 
 * 颜色通过 ANSI 控制码输出，实际显示取决于终端支持和主题。RGB、十六进制及扩展颜色名需要真彩色支持；写入文件或管道时不会自动去除控制码。
@@ -200,7 +209,7 @@
 日志文件说明：
 
 * `patch_log(file_path=None, max_bytes=10 * 1024 * 1024, backup_count=5, suffix=None)` 开启日志副本并返回日志文件的绝对路径。未传 `file_path` 时，第一个调用默认 `patch_log()` 的进程创建 `logs/YYYYMMDD_HHMMSS_pid<ROOT_PID>/` 日志会话目录，并写入 `ppid<PPID>_pid<PID>.log`。其后创建并继承环境的子进程分别调用 `patch_log()` 时会复用同一目录，但各自写入独立文件。传入相对路径时，会在调用时转换为绝对路径。
-* 默认路径下可传 `suffix`，非空后缀会追加在 `.log` 前，例如 `patch_log(suffix="p1")` 生成 `ppid9000_pid10000_p1.log`。显式传入 `file_path` 时，以用户路径为准，`suffix` 不修改文件名。
+* 默认路径下可传 `suffix`，非 `None` 值会先通过 `str()` 转为字符串，非空后缀会追加在 `.log` 前。例如 `patch_log(suffix="p1")` 生成 `ppid9000_pid10000_p1.log`，`patch_log(suffix=1)` 生成 `ppid9000_pid10000_1.log`。显式传入 `file_path` 时，以用户路径为准，`suffix` 不修改文件名。
 * 若父进程未调用默认 `patch_log()`，多个兄弟子进程各自首次调用时会分别创建自己的日志会话目录。日志会话目录通过 `MYPRINTX_LOG_ROOT` 向后代进程继承；`unpatch_log()` 只关闭当前进程的日志记录，不清除该会话信息。
 * 日志以 UTF-8 追加写入，自动去除 ANSI 颜色和样式控制码，不影响终端原有输出。默认路径和指定路径缺少父目录时都会自动创建。
 
@@ -221,7 +230,7 @@
 
 > 全局接管与兼容性：`patch_color()` 可重复调用，快捷函数不会破坏接管状态。它会影响当前解释器后续通过 `builtins.print` 输出的调用，但不影响提前保存的函数引用、`sys.stdout.write()` 等独立输出。
 >
-> 支持常用原生参数，但不保证所有边界行为完全一致。关闭接管或移除库后，原生 `print()` 不接受 `fg_color`、`bg_color`、`style`、`prefix`、`mode` 等扩展参数；只使用原生参数的调用无需因此修改。
+> 支持常用原生参数，但不保证所有边界行为完全一致。关闭接管或移除库后，原生 `print()` 不接受 `fg_color`、`bg_color`、`style`、`prefix`、`mode`、`format` 等扩展参数；只使用原生参数的调用无需因此修改。
 ## 打包与发布
 
     # 在项目根目录运行测试
