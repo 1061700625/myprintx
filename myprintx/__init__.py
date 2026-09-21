@@ -11,7 +11,7 @@ from .core import (
     error,
     exception,
     debug,
-    set_show, 
+    set_show,
     is_show,
     show_debug,
     show_info,
@@ -44,4 +44,4 @@ __all__ = [
     "timer_end",
 ]
 
-__version__ = "1.1.3"
+__version__ = "1.1.4"

@@ -12,8 +12,10 @@ def main():
     print(f"默认日志目录：{log_directory}")
 
     try:
-        # 测试 1：不传路径时，使用 logs/时间戳_pid<PID>.log
+        # 测试 1：不传路径时，使用 logs/时间戳_pid<ROOT_PID>/ppid<PPID>_pid<PID>.log
         default_path = myprintx.patch_log()
+        assert os.path.basename(default_path) == f"ppid{os.getppid()}_pid{os.getpid()}.log"
+        assert os.path.basename(os.path.dirname(default_path)).endswith(f"_pid{os.getpid()}")
         myprintx.patch_prefix(
             show_date=False,
             show_time=False,
@@ -76,7 +78,5 @@ def main():
     print(f"默认日志文件：{default_path}")
     print(f"指定日志文件：{custom_path}")
     print("日志功能测试通过")
-
-
 if __name__ == "__main__":
     main()

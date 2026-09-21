@@ -7,6 +7,7 @@ import traceback
 
 _ANSI_ESCAPE_RE = re.compile(r"\033\[[0-9;]*m")
 _WINDOWS_ANSI_INITIALIZED = False
+_LOG_ROOT_ENV = "MYPRINTX_LOG_ROOT"
 
 
 def _rotate_log(log_path, incoming_size, max_bytes, backup_count):
@@ -17,7 +18,6 @@ def _rotate_log(log_path, incoming_size, max_bytes, backup_count):
         or os.path.getsize(log_path) + incoming_size <= max_bytes
     ):
         return
-
     for index in range(backup_count, 0, -1):
         source = log_path if index == 1 else f"{log_path}.{index - 1}"
         target = f"{log_path}.{index}"
@@ -121,7 +121,7 @@ def print(
     if sys.platform == "win32" and not _WINDOWS_ANSI_INITIALIZED:
         os.system("")
         _WINDOWS_ANSI_INITIALIZED = True
-    
+
     if mode:
         mode = str(mode).lower()
         if mode == "debug" and not getattr(builtins, "__show_debug__", True): return
@@ -229,8 +229,6 @@ def print(
 
     output = text
 
-
-
     native_print = getattr(builtins, "__orig_print__", builtins.print)
     native_print(output, sep=sep, end=end, file=file, flush=flush)
 
@@ -264,11 +262,35 @@ def unpatch_color():
         del builtins.__orig_print__
 
 
-def patch_log(file_path=None, max_bytes=10 * 1024 * 1024, backup_count=5):
-    """开启日志记录并返回绝对路径，默认按 10 MB、5 份备份轮转。"""
+def _get_default_log_path(suffix=None):
+    suffix_part = ""
+    if suffix is not None:
+        if not isinstance(suffix, str):
+            raise TypeError("suffix must be a string or None")
+        if "\x00" in suffix or "/" in suffix or "\\" in suffix:
+            raise ValueError("suffix must not contain path separators")
+        if suffix:
+            suffix_part = f"_{suffix}"
+
+    log_root = os.environ.get(_LOG_ROOT_ENV)
+    if not log_root:
+        root_pid = os.getpid()
+        run_dir = datetime.now().strftime(f"%Y%m%d_%H%M%S_pid{root_pid}")
+        log_root = os.path.abspath(os.path.join("logs", run_dir))
+        os.environ[_LOG_ROOT_ENV] = log_root
+
+    file_name = f"ppid{os.getppid()}_pid{os.getpid()}{suffix_part}.log"
+    return os.path.join(log_root, file_name)
+
+
+def patch_log(file_path=None, max_bytes=10 * 1024 * 1024, backup_count=5, suffix=None):
+    """开启日志记录并返回绝对路径，默认按 10 MB、5 份备份轮转。
+
+    suffix 仅用于默认日志路径，非空时追加在 PID 后、.log 前。
+    显式传入 file_path 时，file_path 保持原样，suffix 不参与路径生成。
+    """
     if file_path is None:
-        file_name = datetime.now().strftime(f"%Y%m%d_%H%M%S_pid{os.getpid()}.log")
-        file_path = os.path.join("logs", file_name)
+        file_path = _get_default_log_path(suffix=suffix)
     log_path = os.path.abspath(os.fspath(file_path))
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
     builtins.__print_log__ = {
@@ -283,8 +305,6 @@ def unpatch_log():
     """关闭日志文件记录。"""
     if hasattr(builtins, "__print_log__"):
         del builtins.__print_log__
-
-
 def patch_prefix(show_date=True, show_time=True, custom_prefix=None, show_location=False, show_pid=None):
     """
     启用自动前缀（日期/时间/进程 ID/自定义/位置信息）
@@ -317,22 +337,25 @@ def unpatch_prefix():
     """
     if hasattr(builtins, "__print_prefix__"):
         del builtins.__print_prefix__
-     
+
 
 def info(*args, **kwargs):
     """信息输出（蓝色）"""
     kwargs.setdefault("mode", "info")
     print(*args, **kwargs)
 
+
 def warn(*args, **kwargs):
     """警告输出（黄色加粗）"""
     kwargs.setdefault("mode", "warn")
     print(*args, **kwargs)
 
+
 def error(*args, **kwargs):
     """错误输出（红色加粗）"""
     kwargs.setdefault("mode", "error")
     print(*args, **kwargs)
+
 
 def exception(*args, **kwargs):
     """错误输出，并附加当前异常的 traceback。"""
@@ -343,6 +366,7 @@ def exception(*args, **kwargs):
     else:
         args = (traceback_text,)
     print(*args, **kwargs)
+
 
 def debug(*args, **kwargs):
     """调试输出（青色）"""
@@ -355,11 +379,12 @@ def show_info(enable: bool=True): builtins.__show_info__   = bool(enable)
 def show_warn(enable: bool=True): builtins.__show_warn__   = bool(enable)
 def show_error(enable: bool=True): builtins.__show_error__ = bool(enable)
 
+
 def set_show(enable: bool):
     """设置是否显示 print 输出，总开关。可用于开发环境正常输出，生产环境屏蔽输出，包括所有的mode"""
     builtins.__print_show__ = bool(enable)
 
+
 def is_show() -> bool:
     """返回当前 print 显示状态"""
     return getattr(builtins, "__print_show__", True)
-

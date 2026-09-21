@@ -30,7 +30,6 @@ class TestTiming(unittest.TestCase):
 
         self.assertEqual(timing.elapsed, 1.25)
         self.assertEqual(self.output.getvalue(), "[TIMER] 数据处理 | 耗时 1.250 秒\n")
-
     def test_manual_timer_returns_elapsed_seconds(self):
         with mock.patch("myprintx.timing.time.perf_counter", side_effect=(20.0, 22.5)):
             myprintx.timer_start("下载")

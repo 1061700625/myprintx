@@ -120,7 +120,6 @@ class TestMyPrintX(unittest.TestCase):
             "violet": "38;2;238;130;238",
             "indigo": "38;2;75;0;130",
         }
-
         for color, code in expected_codes.items():
             with self.subTest(color=color):
                 output = io.StringIO()
@@ -204,25 +203,31 @@ class TestMyPrintX(unittest.TestCase):
                 )
 
     def test_patch_log_default_path_uses_logs_directory_timestamp_and_pid(self):
-        """默认日志应放入 logs 目录，且文件名包含时间戳和 PID。"""
+        """默认日志应放入日志会话目录，文件名包含 PPID 和 PID。"""
         with tempfile.TemporaryDirectory() as directory:
             previous_directory = os.getcwd()
+            old_root = os.environ.pop("MYPRINTX_LOG_ROOT", None)
             try:
                 os.chdir(directory)
                 returned_path = myprintx.patch_log()
                 myprintx.print("默认日志")
             finally:
                 os.chdir(previous_directory)
-
+                os.environ.pop("MYPRINTX_LOG_ROOT", None)
+                if old_root is not None:
+                    os.environ["MYPRINTX_LOG_ROOT"] = old_root
             log_directory = os.path.join(directory, "logs")
             self.assertTrue(os.path.isdir(log_directory))
-            log_names = os.listdir(log_directory)
-            self.assertEqual(len(log_names), 1)
+            run_names = os.listdir(log_directory)
+            self.assertEqual(len(run_names), 1)
             self.assertRegex(
-                log_names[0],
-                rf"^\d{{8}}_\d{{6}}_pid{os.getpid()}\.log$",
+                run_names[0],
+                rf"^\d{{8}}_\d{{6}}_pid{os.getpid()}$",
             )
-            log_path = os.path.join(log_directory, log_names[0])
+            run_directory = os.path.join(log_directory, run_names[0])
+            log_names = os.listdir(run_directory)
+            self.assertEqual(log_names, [f"ppid{os.getppid()}_pid{os.getpid()}.log"])
+            log_path = os.path.join(run_directory, log_names[0])
             self.assertEqual(os.path.realpath(returned_path), os.path.realpath(log_path))
             with open(log_path, encoding="utf-8") as log_file:
                 self.assertEqual(log_file.read(), "默认日志\n")
@@ -329,7 +334,6 @@ class TestMyPrintX(unittest.TestCase):
             show_pid=None,
         )
         myprintx.print("正文")
-
         self.assertEqual(self.output.getvalue(), "[应用] 正文\n")
 
     def test_show_pid_none_displays_in_main_and_child_process(self):
@@ -440,7 +444,6 @@ class TestMyPrintX(unittest.TestCase):
         myprintx.patch_prefix(custom_prefix="TRACE", show_location=True)
         print("全局定位输出")
         out = self.get_output()
-
         self.assertIn("test_prefix_location_with_global_print_patch()", out)
         self.assertIn("全局定位输出", out)
 
@@ -525,7 +528,6 @@ class TestMyPrintX(unittest.TestCase):
         self.assertIn("[ERROR]", out)
         self.assertRegex(out, r"\033\[[0-9;]*31")  # 红色 (允许带样式)
         self.assertRegex(out, r"\033\[[0-9;]*1")   # 加粗
-
     def test_debug_output(self):
         """测试 debug() 输出为白色"""
         myprintx.patch_prefix()
@@ -560,7 +562,6 @@ class TestMyPrintX(unittest.TestCase):
                     self.assertEqual(actual.getvalue(), expected.getvalue())
                     self.assertEqual(actual.flush_count, 1)
                     myprintx.unpatch_color()
-
     def test_color_boundaries_and_legacy_background(self):
         """基础色、大小写、RGB 边界及旧背景写法使用精确输出断言。"""
         cases = (
